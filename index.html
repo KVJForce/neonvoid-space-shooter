@@ -1,0 +1,2072 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEONVOID — retro space shooter</title>
+<style>
+/* ============================================================
+   NEONVOID — styles.css (Agent A)
+   Fullständig UI-stylesheet enligt kontrakt §5:
+   palett via CSS-variabler, .screen/.show-mekanik, glitch-titel,
+   neonknappar, HUD + badges, highscore-listor, scanlines/vignette,
+   :focus-visible och prefers-reduced-motion-fallback.
+   ============================================================ */
+
+/* ---------- 1. Palett + typsnittsstack ---------- */
+:root {
+  --bg: #04060f;
+  --cyan: #00fff7;
+  --magenta: #ff2bd6;
+  --violet: #7a2bff;
+  --amber: #ffb44a;
+  --dim: #9aa7c1;
+  --panel: rgba(10, 16, 34, .86);
+  --danger: #ff3355;
+  --ink: #e8f4ff;
+  --font-mono: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+  color-scheme: dark;
+}
+
+/* ---------- 2. Bas ---------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-mono);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 750px at 78% -12%, rgba(122, 43, 255, .16), transparent 60%),
+    radial-gradient(950px 700px at 8% 112%, rgba(255, 43, 214, .10), transparent 55%);
+  background-attachment: fixed;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, p, dl, ol {
+  margin: 0;
+}
+
+::selection {
+  background: var(--cyan);
+  color: #05131d;
+}
+
+/* ---------- 3. App-ram ---------- */
+#app {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(.6rem, 2vh, 1.5rem) 0;
+  overflow: hidden;
+}
+
+.frame {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .7rem;
+  max-width: fit-content;
+  margin-inline: auto;
+}
+
+/* ---------- 4. Scanlines + vignette (dekor, klickar inte) ---------- */
+.scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .35) 0 1px, transparent 1px 3px);
+  opacity: .12;
+  z-index: 3;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse, transparent 55%, rgba(0, 0, 0, .4));
+  z-index: 3;
+}
+
+/* ---------- 5. HUD ---------- */
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem 1.1rem;
+  padding: .5rem .9rem;
+  user-select: none;
+}
+
+.hud-item {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.hud-label {
+  font-size: .7rem;
+  letter-spacing: .25em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.hud-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 247, .55);
+  font-variant-numeric: tabular-nums;
+}
+
+#hud-shield {
+  margin-left: auto;
+}
+
+.hud-lives {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 1.1rem;
+}
+
+/* Clip-path klipper box-shadow utanför figuren → glow via drop-shadow
+   som ligger EFTER klippet i renderingskedjan. */
+.hud-lives i {
+  display: inline-block;
+  width: 14px;
+  height: 16px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: var(--cyan);
+  filter: drop-shadow(0 0 4px rgba(0, 255, 247, .6));
+  transition: background-color .25s ease, filter .25s ease, opacity .25s ease;
+}
+
+.hud-lives i.lost {
+  background: #3d455c;
+  filter: none;
+  opacity: .55;
+}
+
+/* ---------- 6. Stage + canvas ---------- */
+.stage-wrap {
+  position: relative;
+  width: 96vw;
+  max-width: 1280px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  margin-inline: auto;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 24px rgba(0, 255, 247, .25), inset 0 0 60px rgba(0, 255, 247, .06);
+  background: #04060f;
+}
+
+/* ---------- 7. Skärmar (.screen + .show) ---------- */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .85rem;
+  padding: 2rem 1.4rem;
+  text-align: center;
+  background: var(--panel);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 2;
+  overflow: auto;
+}
+
+.screen.show {
+  display: flex;
+  animation: fade-in-up .35s cubic-bezier(.22, .7, .3, 1) both;
+}
+
+.tagline {
+  color: var(--amber);
+  font-size: .82rem;
+  letter-spacing: .14em;
+}
+
+.legend {
+  color: var(--dim);
+  font-size: .72rem;
+  letter-spacing: .18em;
+  max-width: 60ch;
+}
+
+.subtitle {
+  color: var(--magenta);
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(255, 43, 214, .5);
+}
+
+/* ---------- 8. Highscore-listor ---------- */
+.screen ol {
+  list-style: none;
+  padding: .35rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  align-items: center;
+}
+
+#menu-highscores li,
+#over-highscores li {
+  display: grid;
+  grid-template-columns: 2.6ch 8ch 11ch;
+  column-gap: 1rem;
+  align-items: baseline;
+  padding: .3rem .5rem;
+  border-bottom: 1px solid rgba(122, 43, 255, .16);
+  font-size: .95rem;
+}
+
+.hs-rank {
+  color: var(--violet);
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(122, 43, 255, .55);
+}
+
+.hs-score {
+  color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 247, .45);
+  font-variant-numeric: tabular-nums;
+}
+
+.hs-date {
+  color: var(--dim);
+  font-size: .78em;
+  letter-spacing: .08em;
+}
+
+/* Tom lista (boot: <li class="hs-empty">) — en rad, utan hairline. */
+.hs-empty {
+  display: block;
+  color: var(--dim);
+  font-style: italic;
+  letter-spacing: .1em;
+  font-size: .9rem;
+  border-bottom: 0;
+}
+
+/* ---------- 9. Game over ---------- */
+.over-label {
+  font-size: .75rem;
+  letter-spacing: .3em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.over-value,
+#over-score {
+  font-size: clamp(2.4rem, 6.5vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: .16em;
+  line-height: 1.1;
+  color: #f2feff;
+  text-shadow: 0 0 10px var(--cyan), 0 0 34px rgba(0, 255, 247, .55);
+  font-variant-numeric: tabular-nums;
+}
+
+/* NYTT REKORD! — dold utan .show (boot togglar .show). */
+.badge-new,
+#over-best-new {
+  display: none;
+}
+
+.badge-new.show,
+#over-best-new.show {
+  display: inline-block;
+  margin-top: .2rem;
+  padding: 3px 12px;
+  border: 1px solid var(--magenta);
+  border-radius: 14px;
+  color: var(--magenta);
+  background: rgba(255, 43, 214, .07);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .28em;
+  text-shadow: 0 0 8px rgba(255, 43, 214, .7);
+  box-shadow: 0 0 10px rgba(255, 43, 214, .35), inset 0 0 8px rgba(255, 43, 214, .15);
+  animation: pulse-badge 1.15s ease-in-out infinite;
+}
+
+/* ---------- 10. Paus ---------- */
+.title-sm {
+  font-size: clamp(1.7rem, 4.5vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: .32em;
+  color: var(--cyan);
+  text-shadow: 0 0 8px var(--cyan), 0 0 22px rgba(0, 255, 247, .55);
+}
+
+.hintP {
+  color: var(--dim);
+  font-size: .72rem;
+  letter-spacing: .14em;
+  margin-top: .25rem;
+}
+
+/* ---------- 11. Titel — glitch + flicker ---------- */
+.title {
+  position: relative;
+  display: inline-block;
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: .35em;
+  color: #eafeff;
+  text-shadow:
+    0 0 8px var(--cyan),
+    0 0 24px var(--cyan),
+    3px 0 12px var(--magenta),
+    -3px 0 12px var(--cyan);
+  animation: flicker 4.2s linear infinite;
+}
+
+/* Två pseudo-element med clip-path-slices: chromatiska fel-slices
+   som stegvis hoppar position (glitch). Statiskt läge ser ut som en
+   diskret chromatisk offset — synlig även utan animation. */
+.title::before,
+.title::after {
+  content: 'NEONVOID';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  text-shadow: none;
+}
+
+.title::before {
+  color: var(--magenta);
+  opacity: .85;
+  clip-path: inset(12% 0 44% 0);
+  animation: glitch-shift 2.6s steps(1, end) infinite;
+}
+
+.title::after {
+  color: var(--cyan);
+  opacity: .8;
+  clip-path: inset(58% 0 8% 0);
+  animation: glitch-shift 2.6s steps(1, end) infinite reverse;
+  animation-delay: -1.3s;
+}
+
+.title-over {
+  font-size: clamp(2rem, 5.5vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: .3em;
+  color: var(--danger);
+  text-shadow:
+    0 0 10px var(--danger),
+    0 0 26px rgba(255, 51, 85, .6),
+    3px 0 12px var(--magenta);
+  animation: flicker 5.5s linear infinite;
+}
+
+/* ---------- 12. Neonknappar ---------- */
+button {
+  font: inherit;
+}
+
+.btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--cyan);
+  border-radius: 3px;
+  color: var(--cyan);
+  padding: .65rem 1.4rem;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 255, 247, .12);
+  transition: box-shadow .2s ease, background-color .2s ease, color .2s ease, text-shadow .2s ease, transform .12s ease;
+}
+
+.btn:hover {
+  box-shadow: 0 0 24px rgba(0, 255, 247, .35);
+  background: rgba(0, 255, 247, .08);
+  text-shadow: 0 0 10px rgba(0, 255, 247, .8);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible,
+button:focus-visible {
+  outline: 2px dashed var(--magenta);
+  outline-offset: 3px;
+}
+
+.btn-primary {
+  box-shadow: 0 0 14px rgba(0, 255, 247, .22), inset 0 0 12px rgba(0, 255, 247, .08);
+  background: rgba(0, 255, 247, .05);
+  text-shadow: 0 0 12px rgba(0, 255, 247, .65);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 28px rgba(0, 255, 247, .45), inset 0 0 14px rgba(0, 255, 247, .12);
+}
+
+.btn-icon {
+  padding: .4rem .6rem;
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: 0;
+  border-radius: 6px;
+}
+
+/* ---------- 13. Badges (HUD) ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--cyan);
+  border-radius: 12px;
+  color: var(--cyan);
+  padding: 2px 8px;
+  font-size: .7rem;
+  letter-spacing: .22em;
+  text-shadow: 0 0 6px rgba(0, 255, 247, .5);
+  transition: opacity .25s ease;
+}
+
+.badge-tri {
+  border-color: var(--magenta);
+  color: var(--magenta);
+  text-shadow: 0 0 6px rgba(255, 43, 214, .5);
+}
+
+.badge.hide {
+  opacity: 0;
+}
+
+/* ---------- 14. Footer ---------- */
+.foot {
+  color: var(--dim);
+  font-size: .8rem;
+  letter-spacing: .14em;
+  text-align: center;
+  padding: .55rem .5rem .35rem;
+}
+
+/* ---------- 15. Keyframes ---------- */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  6%       { opacity: .84; }
+  8%       { opacity: 1; }
+  37%      { opacity: .93; }
+  39%      { opacity: .55; }
+  40%      { opacity: .92; }
+  42%      { opacity: 1; }
+  65%      { opacity: .88; }
+  67%      { opacity: 1; }
+  71%      { opacity: .7; }
+  73%      { opacity: 1; }
+}
+
+@keyframes glitch-shift {
+  0%, 100% { transform: none;              clip-path: inset(12% 0 44% 0); }
+  10%      { transform: translate(-5px, -2px); clip-path: inset(4% 0 52% 0); }
+  14%      { transform: translate(3px, 1px);   clip-path: inset(30% 0 30% 0); }
+  17%      { transform: none;              clip-path: inset(12% 0 44% 0); }
+  52%      { transform: translate(4px, 2px);   clip-path: inset(64% 0 2% 0); }
+  55%      { transform: translate(-3px, -1px); clip-path: inset(48% 0 20% 0); }
+  58%      { transform: none;              clip-path: inset(12% 0 44% 0); }
+  80%      { transform: translate(2px, -2px);  clip-path: inset(76% 0 0 0); }
+  83%      { transform: none;              clip-path: inset(12% 0 44% 0); }
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(255, 43, 214, .35), inset 0 0 8px rgba(255, 43, 214, .15);
+  }
+  50% {
+    transform: scale(1.045);
+    box-shadow: 0 0 22px rgba(255, 43, 214, .65), inset 0 0 12px rgba(255, 43, 214, .3);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 16. Åtkomst ---------- */
+/* Minskad rörelse: alla animationer av, men inget tappar synlighet.
+   Glitch-pseudona tas bort helt (dekoration); titeln, listorna,
+   badges och knappar är vanliga statiska element utan dem. */
+@media (prefers-reduced-motion: reduce) {
+  .title,
+  .title::before,
+  .title::after,
+  .title-over,
+  .scanlines,
+  .screen.show,
+  .badge-new.show,
+  #over-best-new.show {
+    animation: none;
+  }
+
+  .title::before,
+  .title::after {
+    content: none;
+  }
+}
+</style>
+</head>
+<body>
+<div id="app">
+ <div class="scanlines" aria-hidden="true"></div>
+ <div class="vignette" aria-hidden="true"></div>
+ <div class="frame">
+  <header class="hud">
+    <div class="hud-item"><span class="hud-label">POÄNG</span><span class="hud-value" id="hud-score">000000</span></div>
+    <div class="hud-item"><span class="hud-label">LIV</span><span class="hud-lives" id="hud-lives"><i></i><i></i><i></i></span></div>
+    <div class="hud-item"><span class="hud-label">REKORD</span><span class="hud-value" id="hud-high">000000</span></div>
+    <span class="badge hide" id="hud-shield">SKÖLD</span>
+    <span class="badge badge-tri hide" id="hud-tri">TRI</span>
+    <button type="button" class="btn btn-icon" id="btn-sound" aria-label="Växla ljud" title="Växla ljud (M)">🔊</button>
+  </header>
+  <main class="stage-wrap">
+    <canvas id="game" width="1280" height="720"></canvas>
+    <section id="screen-menu" class="screen show" role="dialog" aria-label="Huvudmeny">
+      <h1 class="title">NEONVOID</h1>
+      <p class="tagline">En neonklädd rymdjakt — överlev stjärnstormen!</p>
+      <dl class="legend"> RÖR DIG/WASD+PIL · SKJUT/MELLANSLAG · PAUSA/P/ESC · LJUD/M </dl>
+      <h2 class="subtitle">HIGHSCORE — TOPP 5</h2>
+      <ol id="menu-highscores"></ol>
+      <button type="button" class="btn btn-primary" id="btn-start">STARTA SPEL</button>
+    </section>
+    <section id="screen-pause" class="screen" role="dialog" aria-label="Pausad">
+      <h1 class="title-sm">PAUSAD</h1>
+      <button type="button" class="btn btn-primary" id="btn-resume">FORTSÄTT</button>
+      <button type="button" class="btn" id="btn-restart">STARTA OM</button>
+      <p class="hintP">P eller ESC för att återvända</p>
+    </section>
+    <section id="screen-over" class="screen" role="dialog" aria-label="Game over">
+      <h1 class="title-over">GAME OVER</h1>
+      <p class="over-label">DIN POÄNG</p>
+      <p class="over-value" id="over-score">000000</p>
+      <p class="badge-new show" id="over-best-new">NYTT REKORD!</p>
+      <h2 class="subtitle">HIGHSCORE — TOPP 8</h2>
+      <ol id="over-highscores"></ol>
+      <button type="button" class="btn btn-primary" id="btn-again">SPELA IGEN</button>
+      <button type="button" class="btn" id="btn-menu">MENY</button>
+    </section>
+  </main>
+  <footer class="foot">WASD/PIL — rör dig · MELLANSLAG — skjut · P/ESC — paus · M — ljud på/av</footer>
+ </div>
+</div>
+
+<script>
+/* NEONVOID — core contract (Lead-owned). Laddas först. Alla andra regioner fäster på detta namespace. */
+(function () {
+  'use strict';
+  var scope = (typeof window !== 'undefined') ? window : globalThis;
+  var NV = (scope.NV = scope.NV || {});
+
+  NV.cfg = Object.freeze({
+    // Kanvas
+    W: 1280, H: 720,
+    // Spelare
+    LIVES: 3,
+    FIRE_COOLDOWN: 0.14, BULLET_SPEED: 950, ENEMY_BULLET_SPEED: 300,
+    INVULN: 2.0,
+    // Power-ups
+    SHIELD_TIME: 8.0, TRI_TIME: 10.0, TRI_SPREAD_DEG: 14,
+    // Spavner/difficulty ramp
+    SPAWN_START: 1.4, SPAWN_END: 0.42, RAMP_TIME: 90,
+    DROP_SHIP: 0.18, DROP_ROCK: 0.06,
+    // Poäng
+    SCORE: { SCOUT: 100, STRIKER: 250, ROCK_L: 40, ROCK_M: 25, ROCK_S: 10 },
+    // Persistens
+    HIGHSCORE_MAX: 8,
+    HIGHSCORE_KEY: 'nv.highscores.v1',
+    MUTED_KEY: 'nv.muted.v1',
+    // Ljudnamn (låst lista)
+    SFX: ['laser', 'laserEnemy', 'explode', 'explodeBig', 'playerHit', 'powerup', 'shield', 'gameover', 'select'],
+    // States (låst lista)
+    STATES: ['menu', 'playing', 'paused', 'over'],
+    MAX_SHIPS: 28
+  });
+
+  var TAU = Math.PI * 2;
+
+  NV.util = {
+    TAU: TAU,
+    that: '(NV.util — rena hjälpfunktioner, inga DOM/canvas-beroenden)',
+    clamp: function (v, a, b) { return v < a ? a : (v > b ? b : v); },
+    lerp: function (a, b, t) { var tt = NV.util.clamp(t, 0, 1); return a + (b - a) * tt; },
+    rand: function (a, b) { return a + Math.random() * (b - a); },
+    randInt: function (a, b) { return Math.floor(a + Math.random() * (b - a + 1)); },
+    pick: function (arr) { return arr[Math.floor(Math.random() * arr.length)]; },
+    dist: function (x1, y1, x2, y2) { var dx = x2 - x1, dy = y2 - y1; return Math.hypot(dx, dy); },
+    hits: function (x1, y1, r1, x2, y2, r2) {
+      var dx = x2 - x1, dy = y2 - y1, rr = r1 + r2;
+      return dx * dx + dy * dy <= rr * rr;
+    },
+    // Difficulty-ramp: benign nära IDLE, agressivt senare.
+    ramp: function (elapsedSec) {
+      var t = NV.util.clamp((elapsedSec || 0) / NV.cfg.RAMP_TIME, 0, 1);
+      if (t >= 1) {
+        return { t: 1, interval: NV.cfg.SPAWN_END, speedMul: 1.6, strikerChance: 0.45 };
+      }
+      return {
+        t: t,
+        interval: NV.cfg.SPAWN_START - (NV.cfg.SPAWN_START - NV.cfg.SPAWN_END) * t,
+        speedMul: 1 + 0.6 * t,
+        strikerChance: 0.15 + 0.30 * t
+      };
+    }
+  };
+
+  NV.that = 'NEONVOID namespace core — see specs/CONTRACT.md for the binding contract';
+})();
+</script>
+<script>
+/* NEONVOID — audio (Agent C) enligt §6: 100 % Web Audio-syntes (oscillatorer +
+   noise-buffer + GainNode-envelopes), master gain 0.28, cachad noise-buffer,
+   lazy init(), mute-persistens via localStorage NV.cfg.MUTED_KEY (try/catch →
+   in-memory var), och no-op utan krasch när Web Audio saknas (t.ex. node).
+   Ljud får ALDRIG krascha spelet — alla anrop är insvepta i try/catch. */
+(function () {
+  'use strict';
+  var scope = (typeof window !== 'undefined') ? window : globalThis;
+  var NV = (scope.NV = scope.NV || {});
+  NV.audio = NV.audio || {};     // seeda regionen så metoderna kan fästas
+
+  var MASTER = 0.28;               // master gain enligt §6
+  var KEY = (NV.cfg && NV.cfg.MUTED_KEY) || 'nv.muted.v1';
+  var NAMES = (NV.cfg && NV.cfg.SFX) || ['laser', 'laserEnemy', 'explode', 'explodeBig', 'playerHit', 'powerup', 'shield', 'gameover', 'select'];
+
+  var ctx = null;                  // AudioContext när initad, annars null (no-op)
+  var master = null;               // master GainNode (0 när mutad)
+  var noiseBuf = null;             // cachad noise-buffer (byggs vid första burst)
+  var muted = false;               // verkande läge; seedas från persist nedan
+
+  function readPersisted() {
+    try {
+      if (typeof localStorage === 'undefined' || localStorage === null) return null; // node → mem
+      var v = localStorage.getItem(KEY);
+      if (v === null || v === undefined) return null;
+      return v === '1' || v === 'true';
+    } catch (e) { return null; }   // thrown access → in-memory silent
+  }
+
+  function persist(v) {
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage !== null) {
+        localStorage.setItem(KEY, v ? '1' : '0');
+      }
+      // node (typeof localStorage undefined) och quota/kast: `muted`-variabeln
+      // är redan det verkande in-memory-läget — tyst fallback per kontrakt.
+    } catch (e) { /* tyst */ }
+  }
+
+  muted = !!readPersisted();       // init() respekterar persisterat värde
+
+  function audioCtor() {
+    try {
+      if (typeof window !== 'undefined' && window) {
+        if (window.AudioContext) return window.AudioContext;
+        if (window.webkitAudioContext) return window.webkitAudioContext;
+      }
+      if (typeof AudioContext !== 'undefined') return AudioContext;
+      if (typeof webkitAudioContext !== 'undefined') return webkitAudioContext;
+    } catch (e) { /* skadad miljö */ }
+    return null;                   // no-WebAudio → no-op-läge
+  }
+
+  function resume() {
+    try {
+      if (ctx && ctx.state === 'suspended' && ctx.resume) {
+        var p = ctx.resume();
+        if (p && typeof p.catch === 'function') p.catch(function () {});
+      }
+    } catch (e) { /* tyst */ }
+  }
+
+  /** Lazy init: skapar AudioContext + master gain vid första anrop. */
+  NV.audio.init = function () {
+    try {
+      if (ctx) { resume(); return true; }
+      var AC = audioCtor();
+      if (!AC) return false;       // no-WebAudio → no-op utan crash
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = muted ? 0 : MASTER;
+      master.connect(ctx.destination);
+      noiseBuf = null;             // byggs vid första noise-burst
+      resume();
+      return true;
+    } catch (e) {
+      ctx = null; master = null; noiseBuf = null;
+      return false;                // ljud får aldrig krascha spelet
+    }
+  };
+
+  function makeNoise() {
+    if (noiseBuf) return noiseBuf;
+    var len = Math.max(1, Math.floor(ctx.sampleRate * 0.6));
+    noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+
+  // Oscillator-voice: sweep f0→f1 (0 = statisk) + env (snabb attack, exp-decay).
+  function tone(type, f0, f1, t0, dur, peak, detune) {
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0);
+    if (f1) o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t0 + dur);
+    if (detune) o.detune.setValueAtTime(detune, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + Math.min(0.012, dur * 0.25));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g);
+    g.connect(master);
+    o.start(t0);
+    o.stop(t0 + dur + 0.03);
+  }
+
+  // Noise-burst genom filter (lowpass/bandpass) med sweep + env.
+  function burst(t0, dur, peak, f0, f1, ftype) {
+    var src = ctx.createBufferSource();
+    src.buffer = makeNoise();
+    src.loop = true;
+    var filt = ctx.createBiquadFilter();
+    filt.type = ftype || 'lowpass';
+    filt.frequency.setValueAtTime(f0, t0);
+    if (f1) filt.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + Math.min(0.008, dur * 0.25));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(filt);
+    filt.connect(g);
+    g.connect(master);
+    src.start(t0);
+    src.stop(t0 + dur + 0.03);
+  }
+
+  // Sine med vibrato (LFO modulerar frekvensen) — för sköld-tonen.
+  function vibrato(t0, dur, peak, f0, vibHz, vibDepth) {
+    var o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t0);
+    var lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(vibHz, t0);
+    var lg = ctx.createGain();
+    lg.gain.setValueAtTime(vibDepth, t0);
+    lfo.connect(lg);
+    lg.connect(o.frequency);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g);
+    g.connect(master);
+    o.start(t0); lfo.start(t0);
+    o.stop(t0 + dur + 0.03); lfo.stop(t0 + dur + 0.03);
+  }
+
+  // Karaktär per SFX-namn enligt §6 (t0 = starttid i AudioContext-klockan).
+  var SFX = {
+    laser: function (t) { tone('square', 880, 1760, t, 0.08, 0.16); },
+    laserEnemy: function (t) { tone('sawtooth', 440, 220, t, 0.12, 0.14); },
+    explode: function (t) { burst(t, 0.18, 0.3, 900, 80, 'lowpass'); },
+    explodeBig: function (t) {
+      burst(t, 0.32, 0.35, 700, 60, 'lowpass');
+      tone('sine', 60, 0, t, 0.32, 0.4);                   // sub-thump
+    },
+    playerHit: function (t) {
+      tone('sawtooth', 200, 60, t, 0.3, 0.14);
+      tone('sawtooth', 200, 60, t, 0.3, 0.14, 18);         // 2×saw, lätt detunad
+      burst(t, 0.26, 0.22, 1200, 200, 'bandpass');
+    },
+    powerup: function (t) {                                // 3-node arp, summa .36s
+      tone('sine', 523.25, 0, t, 0.12, 0.16);
+      tone('sine', 659.25, 0, t + 0.12, 0.12, 0.16);
+      tone('sine', 783.99, 0, t + 0.24, 0.12, 0.16);
+    },
+    shield: function (t) { vibrato(t, 0.5, 0.18, 110, 6, 10); },
+    gameover: function (t) {                               // fallande saw: 392→311→247→196, 1.2s
+      tone('sawtooth', 392.00, 0, t, 0.3, 0.13);
+      tone('sawtooth', 311.13, 0, t + 0.3, 0.3, 0.13);
+      tone('sawtooth', 246.94, 0, t + 0.6, 0.3, 0.13);
+      tone('sawtooth', 196.00, 0, t + 0.9, 0.3, 0.13);
+    },
+    select: function (t) { tone('square', 4000, 0, t, 0.04, 0.1); }
+  };
+
+  /** Spela upp namn validerat mot NV.cfg.SFX; no-op när ej initad/mutad/ogiltigt. */
+  NV.audio.play = function (name) {
+    try {
+      if (!ctx || !master) return;                     // ej initad / no-WebAudio
+      if (NAMES.indexOf(name) === -1) return;          // validera mot cfg.SFX
+      if (muted) return;                               // tyst läge → hoppa nodskapande
+      var gen = SFX[name];
+      if (gen) gen(ctx.currentTime);
+    } catch (e) { /* ljudfel får aldrig nå spelloopen */ }
+  };
+
+  /** Mute-läge: master gain 0 / återställ .28; persist i localStorage → mem-fallback. */
+  NV.audio.setMuted = function (b) {
+    muted = !!b;
+    persist(muted);
+    try {
+      if (master) master.gain.value = muted ? 0 : MASTER;
+    } catch (e) { /* tyst */ }
+  };
+
+  /** Växla mute-läge; returnerar nya läget (booleskt). */
+  NV.audio.toggleMuted = function () {
+    NV.audio.setMuted(!muted);
+    return muted;
+  };
+
+  /** Nuvarande mute-läge. */
+  NV.audio.isMuted = function () { return !!muted; };
+})();
+</script>
+<script>
+/* NEONVOID — scores (Agent C) enligt §7: highscore-lista med poäng-sortsering desc
+   + datum-tiebreaker (tidigast först), trim till NV.cfg.HIGHSCORE_MAX, tolerant
+   laddning (ogiltig JSON/icke-array/skitsurfade entries filtreras) och ALLT
+   localStorage i try/catch → in-memory fallback för hela sessionen.
+   Entry-format: {score:int>0, date:'YYYY-MM-DD'}. Dual-mode: window || globalThis. */
+(function () {
+  'use strict';
+  var scope = (typeof window !== 'undefined') ? window : globalThis;
+  var NV = (scope.NV = scope.NV || {});
+
+  var KEY = (NV.cfg && NV.cfg.HIGHSCORE_KEY) || 'nv.highscores.v1';
+  var MAX = (NV.cfg && NV.cfg.HIGHSCORE_MAX) || 8;
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  var UNSET = {};                 // signal: localStorage ännu inte sondad
+
+  var realC = UNSET;              // cachad sondning av localStorage (eller null)
+  var injected = null;            // test-injektion: aktivt storage-lik objekt
+  var injActive = false;          // sätts vid explicit load(storage)-anrop
+  var fallBack = false;           // sant → hela sessionen kör i minnet
+  var MEM = null;                 // in-memory fallback-data (nyckel → sträng)
+
+  function memStore() {
+    if (!MEM) MEM = {};
+    return {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(MEM, k) ? MEM[k] : null; },
+      setItem: function (k, v) { MEM[k] = String(v); },
+      removeItem: function (k) { delete MEM[k]; }
+    };
+  }
+
+  function detectReal() {
+    try {
+      var s = (typeof localStorage !== 'undefined') ? localStorage : null;
+      if (s && typeof s.getItem === 'function' && typeof s.setItem === 'function') {
+        s.getItem(KEY);           // sond: thrown access upptäcks här
+        return s;
+      }
+    } catch (e) { /* thrown access / sekretessläge → mem */ }
+    return null;
+  }
+
+  function real() {
+    if (realC === UNSET) realC = detectReal();
+    return realC;
+  }
+
+  function activeStore() {
+    if (fallBack) return memStore();
+    if (injActive) return injected ? injected : memStore(); // explicit null → tvinga mem
+    var s = real();
+    return s ? s : memStore();
+  }
+
+  function sanitize(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (!e || typeof e !== 'object') continue;                        // icke-object → filtreras
+      var s = (typeof e.score === 'number') ? e.score : NaN;
+      if (!isFinite(s) || s <= 0) continue;                             // NaN/∞/≤0 → filtreras
+      if (typeof e.date !== 'string' || !DATE_RE.test(e.date)) continue; // date saknas/skräp → kastas
+      out.push({ score: Math.floor(s), date: e.date });
+    }
+    return out;
+  }
+
+  function cmp(a, b) {
+    if (b.score !== a.score) return b.score - a.score;                  // poäng desc
+    if (a.date < b.date) return -1;                                     // tie: tidigast datum först
+    if (a.date > b.date) return 1;
+    return 0;
+  }
+
+  function parseList(raw) {
+    if (typeof raw !== 'string' || raw === '') return [];
+    var parsed;
+    try { parsed = JSON.parse(raw); } catch (e) { return []; }          // ogiltig JSON → []
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed)) return []; // icke-array → []
+    return sanitize(parsed).sort(cmp);
+  }
+
+  function readAll() {
+    var raw = null;
+    try {
+      raw = activeStore().getItem(KEY);
+    } catch (e) {
+      fallBack = true;                                                  // thrown access → minnet
+      try { raw = memStore().getItem(KEY); } catch (e2) { raw = null; }
+    }
+    return parseList(raw);
+  }
+
+  function writeAll(list) {
+    var json;
+    try { json = JSON.stringify(list); } catch (e) { return false; }
+    var ok = false;
+    try {
+      activeStore().setItem(KEY, json);
+      ok = true;
+    } catch (e) {
+      fallBack = true;                                                  // quota/kast → minnet
+      try { memStore().setItem(KEY, json); ok = true; } catch (e2) { ok = false; }
+    }
+    return ok;
+  }
+
+  function num(v) {                     // poängvalidering: äkta tal, ändligt, > 0
+    if (typeof v !== 'number' || !isFinite(v) || v <= 0) return null;
+    return Math.floor(v);
+  }
+
+  function today() {                    // 'YYYY-MM-DD' (lokal tid)
+    var d = new Date();
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return '' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  NV.scores = {
+    that: '(NV.scores — highscores med tolerant persistens; load(storage) accepterar valfri storage för test)',
+
+    /** Läs sanerad + sorterad lista. Valfri storage-lik källa som argument (test);
+     *  explicit null tvingar in-memory. Default: localStorage → mem-fallback. */
+    load: function (storage) {
+      if (arguments.length > 0) {
+        injected = (storage && typeof storage.getItem === 'function') ? storage : null;
+        injActive = true;
+      }
+      try { return readAll(); } catch (e) { return []; }
+    },
+
+    /** true om score>0 och (plats finns i listan ELLER score slår sämsta). */
+    qualifies: function (score) {
+      var n = num(score);
+      if (n === null) return false;
+      var list = readAll();
+      return list.length < MAX || n > list[list.length - 1].score;
+    },
+
+    /** Validera + infoga + trimma. Returnerar {rank (1-baserad eller 0 om ej kval),
+     *  isBest (bool — score > alla gamla), best (int, topp efter infogning)}. */
+    add: function (score) {
+      var n = num(score);
+      var list = readAll();
+      var oldBest = list.length ? list[0].score : 0;
+      if (n === null || !(list.length < MAX || n > list[list.length - 1].score)) {
+        return { rank: 0, isBest: false, best: oldBest };               // ej kvalificerad
+      }
+      var isBest = (list.length === 0) ? true : n > list[0].score;
+      var entry = { score: n, date: today() };
+      list.push(entry);
+      list.sort(cmp);
+      if (list.length > MAX) list.length = MAX;                         // sämsta bort från slutet
+      var rank = 0;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] === entry) { rank = i + 1; break; }
+      }
+      writeAll(list);
+      return { rank: rank, isBest: isBest, best: list.length ? list[0].score : 0 };
+    },
+
+    /** Bästa poängen (listtopp), 0 om tom. */
+    best: function () {
+      var list = readAll();
+      return list.length ? list[0].score : 0;
+    },
+
+    /** Töm listan (debug). */
+    clear: function () {
+      try { activeStore().removeItem(KEY); } catch (e) { fallBack = true; }
+      try { memStore().removeItem(KEY); } catch (e2) { /* tyst */ }
+    }
+  };
+})();
+</script>
+<script>
+/* NEONVOID — engine (Agent B): gameloop, input, spawner, fysik, kollisioner, render.
+   Kontrakt: specs/CONTRACT.md §2–§3. Endast canvas-DOM. ES5/var-stil som core.js.
+   Kollar NV.util.hits (kvadratisk) för ALLA kollisioner — inga egna dist-dupletter. */
+(function () {
+  'use strict';
+
+  var scope = (typeof window !== 'undefined') ? window : globalThis;
+  var NV = scope.NV || (scope.NV = {});
+  var cfg = NV.cfg;      // frusen kontraktstabell från core.js
+  var U = NV.util;       // kontrakts-helpers — används, aldrig dubletter
+  var TAU = U.TAU;
+
+  var COL = {
+    bg: '#04060f', cyan: '#00fff7', magenta: '#ff2bd6', violet: '#7a2bff',
+    amber: '#ffb44a', dim: '#9aa7c1', danger: '#ff3355', white: '#ffffff'
+  };
+
+  var PLAYER_R = 13, PLAYER_SPEED = 460, BOLT_R = 4;
+  var SHAKE_HIT = 14, SHAKE_DECAY = 34;
+  var PART_CAP = 260, FX_CAP = 12;
+  var ROCKDEF = {
+    L: { r: 34, hp: 3, score: cfg.SCORE.ROCK_L },
+    M: { r: 22, hp: 2, score: cfg.SCORE.ROCK_M },
+    S: { r: 14, hp: 1, score: cfg.SCORE.ROCK_S }
+  };
+  var STARSPEED = [22, 48, 96];
+  var FONT = '700 14px Consolas, "Cascadia Mono", "Courier New", monospace';
+
+  var game = (NV.game = NV.game || {});
+
+  game.create = function (canvasEl, hooks) {
+    var cv = canvasEl;
+    var ctx = (cv && cv.getContext) ? cv.getContext('2d') : null;
+
+    var cbState = null, cbHud = null, cbOver = null;
+    if (hooks) {
+      cbState = (typeof hooks.onState === 'function') ? hooks.onState : null;
+      cbHud = (typeof hooks.onHud === 'function') ? hooks.onHud : null;
+      cbOver = (typeof hooks.onGameOver === 'function') ? hooks.onGameOver : null;
+    }
+
+    /* --- lägesvariabler --- */
+    var state = 'menu', rafId = -1, lastT = null, running = true, destroyed = false;
+    var ambT = 0;                                   // ambient-tid (rör sig i alla states)
+    var player = { x: cfg.W * 0.5, y: cfg.H - 90, alive: false };
+    var score = 0, lives = cfg.LIVES, kills = 0, elapsed = 0, hiCache = 0;
+    var cooldown = 0, invuln = 0, shield = 0, tri = 0;
+    var shake = 0, spawnT = 0, flameAcc = 0, shootHeld = false;
+    var keyUp = false, keyDown = false, keyLeft = false, keyRight = false;
+    var hudAcc = 0, hudForce = false, lastHudScore = -1, lastHudLives = -1;
+    var overPending = false, overRes = null;
+
+    /* --- objekt-pooler (reuse — inga nya objekt per frame) --- */
+    var bullets = mkpool(), ships = mkpool(), rocks = mkpool(), ebul = mkpool(),
+        parts = mkpool(), pows = mkpool(), fx = mkpool();
+
+    function mkpool() { return { list: [], pool: [], n: 0 }; }
+    function pspawn(p) { var o = p.pool.pop(); if (!o) o = {}; p.list[p.n] = o; p.n++; return o; }
+    function pkill(p, i) { p.pool.push(p.list[i]); p.list[i] = p.list[p.n - 1]; p.n--; }
+    function pclear(p) { var i; for (i = 0; i < p.n; i++) p.pool.push(p.list[i]); p.list.length = 0; p.n = 0; }
+
+    /* --- stjärnhimmel: 3 parallax-lager 120/60/30, wrap --- */
+    var star0 = [], star1 = [], star2 = [];
+    var STARCOL = ['rgba(154,167,193,0.60)', 'rgba(0,255,247,0.55)', 'rgba(255,255,255,0.85)'];
+
+    function initStars() {
+      var l, i, cnt = [120, 60, 30];
+      for (l = 0; l < 3; l++) {
+        for (i = 0; i < cnt[l]; i++) {
+          var s = { x: U.rand(0, cfg.W), y: U.rand(0, cfg.H) };
+          if (l === 0) star0.push(s); else if (l === 1) star1.push(s); else star2.push(s);
+        }
+      }
+    }
+
+    /* --- missing-API-vänliga wrappers (kontrakt §2, inga stubs skapas) --- */
+    function sfx(name) {
+      try { if (NV.audio && typeof NV.audio.play === 'function') NV.audio.play(name); } catch (e) {}
+    }
+    function loadHi() {
+      var v = 0;
+      try {
+        var l = (NV.scores && typeof NV.scores.load === 'function') ? NV.scores.load() : null;
+        if (l && l.length && l[0]) v = l[0].score || 0;
+      } catch (e) { v = 0; }
+      return (typeof v === 'number' && isFinite(v) && v > 0) ? Math.floor(v) : 0;
+    }
+
+    /* --- input (window-nivå, håll-in-flerslag via boolsatser) --- */
+    function onKeyDown(e) {
+      var c = (e && e.code) ? e.code : '';
+      if (c === 'Space') shootHeld = true;
+      else if (c === 'KeyW' || c === 'ArrowUp') keyUp = true;
+      else if (c === 'KeyS' || c === 'ArrowDown') keyDown = true;
+      else if (c === 'KeyA' || c === 'ArrowLeft') keyLeft = true;
+      else if (c === 'KeyD' || c === 'ArrowRight') keyRight = true;
+      else if ((c === 'KeyP' || c === 'Escape') && !e.repeat) {
+        if (state === 'playing') setState('paused');
+        else if (state === 'paused') { lastT = null; setState('playing'); }
+      }
+      if (state !== 'menu' && (c === 'Space' || c.indexOf('Arrow') === 0)) {
+        if (e.preventDefault) e.preventDefault();
+      }
+    }
+    function onKeyUp(e) {
+      var c = (e && e.code) ? e.code : '';
+      if (c === 'Space') shootHeld = false;
+      else if (c === 'KeyW' || c === 'ArrowUp') keyUp = false;
+      else if (c === 'KeyS' || c === 'ArrowDown') keyDown = false;
+      else if (c === 'KeyA' || c === 'ArrowLeft') keyLeft = false;
+      else if (c === 'KeyD' || c === 'ArrowRight') keyRight = false;
+    }
+    function onBlur() { keyUp = keyDown = keyLeft = keyRight = false; shootHeld = false; }
+
+    /* --- state/HUD --- */
+    function setState(s) {
+      if (destroyed) return;
+      state = s;
+      if (cbState) cbState(s);
+    }
+
+    function resetRun() {
+      score = 0; kills = 0; lives = cfg.LIVES; elapsed = 0;
+      cooldown = 0; invuln = 0; shield = 0; tri = 0; shake = 0;
+      spawnT = U.ramp(0).interval; flameAcc = 0; shootHeld = false;
+      pclear(bullets); pclear(ships); pclear(rocks); pclear(ebul);
+      pclear(parts); pclear(pows); pclear(fx);
+      player.x = cfg.W * 0.5; player.y = cfg.H - 90; player.alive = true;
+      hudAcc = 0; hudForce = true; lastHudScore = -1; lastHudLives = -1;
+      overPending = false; overRes = null;
+      hiCache = loadHi();          // kontrakt: hi cacheas vid run-start (NV.scores.load()[0]?.score||0)
+    }
+
+    function hudEmit() {
+      lastHudScore = score; lastHudLives = lives;
+      if (cbHud) cbHud({ score: score, hi: hiCache, lives: lives, shield: shield, tri: tri });
+    }
+
+    function hudTick(dt) {
+      hudAcc += dt;
+      if (hudForce || lastHudScore !== score || lastHudLives !== lives || hudAcc >= 0.2) {
+        hudAcc = 0; hudForce = false; hudEmit();
+      }
+    }
+
+    /* --- spelare träffad (osköldad): liv-- + blink + shake --- */
+    function playerDamage() {
+      lives = Math.max(0, lives - 1);
+      invuln = cfg.INVULN; shake = SHAKE_HIT;
+      sfx('playerHit'); sfx('explode');
+      burst(player.x, player.y, COL.amber, 16, 320);
+      shatter(player.x, player.y, COL.danger, 6, 260);
+      hudForce = true;
+      if (lives <= 0) enterOver();
+    }
+
+    /* --- over-state: sim fryst men rAF fortsätter; onGameOver nästa frame --- */
+    function enterOver() {
+      player.alive = false;
+      sfx('gameover');
+      overRes = { score: score, seconds: Math.round(elapsed * 100) / 100, kills: kills };
+      overPending = true;
+      setState('over');
+      hudEmit();               // flush: lives=0 + slutpoäng (hudTick pausas i 'over')
+    }
+
+    /* ============================================================
+       SPAWNER (endast playing) — tick per ramp.interval (kontrakt §3)
+       ============================================================ */
+    function spawnTick(rmp) {
+      if (Math.random() < 0.4) spawnRock(rmp);
+      else if (ships.n < cfg.MAX_SHIPS) spawnShip(rmp);
+    }
+
+    function spawnRock(rmp) {
+      var q = Math.random(), size = (q < 0.4) ? 'L' : ((q < 0.8) ? 'M' : 'S');
+      var o = pspawn(rocks), d = ROCKDEF[size], k, n = U.randInt(8, 11);
+      if (!o.pts) o.pts = [];
+      o.size = size; o.r = d.r; o.hp = d.hp;
+      o.x = U.rand(40, cfg.W - 40); o.y = -40;
+      o.vx = U.rand(-40, 40); o.vy = U.rand(55, 160) * rmp.speedMul;
+      o.ang = U.rand(0, TAU); o.av = U.rand(-1.8, 1.8);
+      for (k = 0; k < n; k++) o.pts[k] = d.r * U.rand(0.72, 1.28);
+      o.np = n;
+    }
+
+    function spawnShip(rmp) {
+      var striker = Math.random() < rmp.strikerChance;
+      var s = pspawn(ships);
+      s.striker = striker;
+      s.baseX = U.rand(40, cfg.W - 40); s.x = s.baseX; s.y = -30;
+      s.vy = (striker ? U.rand(80, 140) : U.rand(110, 170)) * rmp.speedMul;
+      s.r = striker ? 22 : 18;
+      s.hp = striker ? 2 : 1;
+      s.t = 0; s.phase = U.rand(0, TAU); s.hx = 0;
+      s.shootT = U.rand(0.8, 1.8);
+    }
+
+    /* ============================================================
+       SKOTT (spelare): bolt r4 dmg1 |v|=BULLET_SPEED; tri → 3 st ±TRI_SPREAD_DEG
+       ============================================================ */
+    function fire() {
+      var spd = cfg.BULLET_SPEED, a = cfg.TRI_SPREAD_DEG * Math.PI / 180, k;
+      sfx('laser');
+      if (tri > 0) { bolt(0, spd); bolt(a, spd); bolt(-a, spd); }
+      else bolt(0, spd);
+      for (k = 0; k < 3; k++) {
+        if (parts.n >= PART_CAP) break;
+        var m = pspawn(parts), amt = U.rand(0, TAU), v = U.rand(30, 90);
+        m.x = player.x + U.rand(-3, 3); m.y = player.y - 15;
+        m.vx = Math.cos(amt) * v; m.vy = Math.sin(amt) * v - 40;
+        m.life = m.max = 0.08; m.size = U.rand(1.5, 3); m.col = COL.white;
+        m.kind = 0; m.a = 0; m.spin = 0; m.len = 0;
+      }
+    }
+
+    function bolt(a, spd) {
+      var b = pspawn(bullets);
+      b.x = player.x + Math.sin(a) * 8; b.y = player.y - 13;
+      b.vx = Math.sin(a) * spd; b.vy = -Math.cos(a) * spd;
+    }
+
+    /* --- fiendeskott: aimed bullet, r3 magenta --- */
+    function enemyFire(s) {
+      var dx = player.x - s.x, dy = player.y - s.y;
+      var l = Math.sqrt(dx * dx + dy * dy);
+      if (l < 1) { dx = 0; dy = 1; l = 1; }
+      var v = cfg.ENEMY_BULLET_SPEED, b = pspawn(ebul);
+      b.x = s.x; b.y = s.y + s.r * 0.5;
+      b.vx = dx / l * v; b.vy = dy / l * v;
+      sfx('laserEnemy');
+    }
+
+    /* ============================================================
+       KILL-RUTINER (poäng + explode + shards + ev powerup-drop)
+       ============================================================ */
+    function maybeDrop(x, y, chance) {
+      if (Math.random() >= chance) return;
+      if (pows.n >= 40) return;
+      var o = pspawn(pows);
+      o.type = (Math.random() < 0.5) ? 'shield' : 'tri';
+      o.x = U.clamp(x, 20, cfg.W - 20); o.y = y;
+      o.vy = U.rand(120, 170); o.t = 0; o.r = 15;
+    }
+
+    function killShip(i, scored) {
+      var s = ships.list[i], x = s.x, y = s.y, st = s.striker;
+      pkill(ships, i);
+      if (scored) {
+        score += st ? cfg.SCORE.STRIKER : cfg.SCORE.SCOUT;
+        kills++;
+        sfx(st ? 'explodeBig' : 'explode');
+        burst(x, y, st ? COL.magenta : COL.cyan, st ? 18 : 14, 300);
+        shatter(x, y, st ? COL.magenta : COL.cyan, st ? 8 : 6, 240);
+        maybeDrop(x, y, cfg.DROP_SHIP);
+        hudForce = true;
+      } else {
+        burst(x, y, COL.dim, 10, 240);
+      }
+    }
+
+    function killRock(i, scored) {
+      var o = rocks.list[i];
+      var x = o.x, y = o.y, size = o.size, vy = o.vy;
+      pkill(rocks, i);
+      if (scored) {
+        score += ROCKDEF[size].score;
+        kills++;
+        sfx(size === 'L' ? 'explodeBig' : 'explode');
+        if (size === 'L') burst(x, y, COL.amber, 22, 320);
+        else burst(x, y, '#cbd5e8', size === 'M' ? 16 : 11, 260);
+        shatter(x, y, '#8fa3bf', size === 'L' ? 8 : (size === 'M' ? 5 : 3), 220);
+        maybeDrop(x, y, cfg.DROP_ROCK);
+        hudForce = true;
+        splitRock(x, y, size, vy);
+      } else {
+        burst(x, y, COL.dim, 10, 240);
+      }
+    }
+
+    function splitRock(x, y, size, parentVy) {
+      if (size === 'S') return;
+      var cs = (size === 'L') ? 'M' : 'S';
+      var d = ROCKDEF[cs], k;
+      for (k = 0; k < 2; k++) {
+        var o = pspawn(rocks), j, n = U.randInt(8, 11);
+        if (!o.pts) o.pts = [];
+        o.size = cs; o.r = d.r; o.hp = d.hp;
+        o.x = U.clamp(x + (k === 0 ? -18 : 18), 24, cfg.W - 24); o.y = y;
+        o.vx = (k === 0) ? -60 : 60; o.vy = parentVy - 20;
+        o.ang = U.rand(0, TAU); o.av = U.rand(-1.8, 1.8);
+        for (j = 0; j < n; j++) o.pts[j] = d.r * U.rand(0.72, 1.28);
+        o.np = n;
+      }
+    }
+
+    /* --- powerup-pickup: dist<26, max-trick, ljud + floater + ripple --- */
+    function pickupPass() {
+      var i, o;
+      for (i = pows.n - 1; i >= 0; i--) {
+        o = pows.list[i];
+        if (U.dist(player.x, player.y, o.x, o.y) < 26) {
+          if (o.type === 'shield') {
+            shield = Math.max(shield, cfg.SHIELD_TIME);
+            sfx('shield');
+            pushText('+SKÖLD', o.x, o.y, COL.cyan);
+            pushRipple(o.x, o.y, COL.cyan);
+          } else {
+            tri = Math.max(tri, cfg.TRI_TIME);
+            sfx('powerup');
+            pushText('+TRISKOTT', o.x, o.y, COL.magenta);
+            pushRipple(o.x, o.y, COL.magenta);
+          }
+          pkill(pows, i);
+          hudForce = true;
+        }
+      }
+    }
+
+    /* ============================================================
+       PARTICLAR + FX (pool-reuse; caps per kontrakt)
+       ============================================================ */
+    function burst(x, y, col, count, power) {
+      var k;
+      for (k = 0; k < count; k++) {
+        if (parts.n >= PART_CAP) break;
+        var p = pspawn(parts);
+        var a = U.rand(0, TAU), v = U.rand(power * 0.2, power);
+        p.x = x; p.y = y;
+        p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+        p.life = p.max = U.rand(0.3, 0.7);
+        p.size = U.rand(1.5, 3.5);
+        p.col = col; p.kind = 0; p.a = 0; p.spin = 0; p.len = 0;
+      }
+    }
+
+    function shatter(x, y, col, count, power) {
+      var k;
+      for (k = 0; k < count; k++) {
+        if (parts.n >= PART_CAP) break;
+        var p = pspawn(parts);
+        var a = U.rand(0, TAU), v = U.rand(power * 0.3, power);
+        p.x = x; p.y = y;
+        p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+        p.life = p.max = U.rand(0.35, 0.8);
+        p.size = U.rand(1.6, 2.6);
+        p.col = col; p.kind = 1;
+        p.a = U.rand(0, TAU); p.spin = U.rand(-6, 6); p.len = U.rand(6, 14);
+      }
+    }
+
+    function spawnFlame() {
+      if (parts.n >= PART_CAP) return;
+      var p = pspawn(parts);
+      p.x = player.x + U.rand(-4, 4); p.y = player.y + 13;
+      p.vx = U.rand(-25, 25); p.vy = U.rand(140, 250);
+      p.life = p.max = U.rand(0.16, 0.3);
+      p.size = U.rand(1.8, 3.2);
+      p.col = (Math.random() < 0.3) ? '#ffd9a0' : COL.amber;
+      p.kind = 0; p.a = 0; p.spin = 0; p.len = 0;
+    }
+
+    function pushText(text, x, y, col) {
+      if (fx.n >= FX_CAP) return;
+      var o = pspawn(fx);
+      o.kind = 0; o.text = text; o.x = x; o.y = y;
+      o.t = 0; o.max = 1.0; o.col = col; o.r = 0;
+    }
+
+    function pushRipple(x, y, col) {
+      if (fx.n >= FX_CAP) return;
+      var o = pspawn(fx);
+      o.kind = 1; o.text = ''; o.x = x; o.y = y;
+      o.t = 0; o.max = 0.55; o.col = col; o.r = 0;
+    }
+
+    /* ============================================================
+       SIM (endast state 'playing') — dt i SEKUNDER
+       ============================================================ */
+    function sim(dt) {
+      var rmp = U.ramp(elapsed);
+      elapsed += dt;
+
+      /* spawner-akkumulator */
+      spawnT -= dt;
+      var guard = 0;
+      while (spawnT <= 0 && guard < 8) { spawnTick(rmp); spawnT += rmp.interval; guard++; }
+
+      /* spelare: rörelse (normaliserad) + clamp x[0,W] y[40,H-40] */
+      var dx = 0, dy = 0;
+      if (keyUp) dy -= 1; if (keyDown) dy += 1;
+      if (keyLeft) dx -= 1; if (keyRight) dx += 1;
+      if (dx || dy) {
+        var l = Math.sqrt(dx * dx + dy * dy);
+        player.x = U.clamp(player.x + (dx / l) * PLAYER_SPEED * dt, 0, cfg.W);
+        player.y = U.clamp(player.y + (dy / l) * PLAYER_SPEED * dt, 40, cfg.H - 40);
+      }
+
+      /* skjut + cooldown */
+      cooldown -= dt;
+      if (shootHeld && cooldown <= 0) { fire(); cooldown = cfg.FIRE_COOLDOWN; }
+
+      /* timers */
+      if (invuln > 0) invuln -= dt;
+      if (shield > 0) shield -= dt;
+      if (tri > 0) tri -= dt;
+
+      /* engine-flame från spelarens bakre */
+      flameAcc += dt;
+      while (flameAcc >= 0.033) { flameAcc -= 0.033; spawnFlame(); }
+
+      updateBullets(dt);
+      updateShips(dt);
+      updateRocks(dt);
+      updateEbullets(dt);
+      updatePows(dt);
+
+      collisions();
+      pickupPass();
+    }
+
+    function updateBullets(dt) {
+      var i, b;
+      for (i = bullets.n - 1; i >= 0; i--) {
+        b = bullets.list[i];
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.y < -14 || b.x < -14 || b.x > cfg.W + 14) pkill(bullets, i);
+      }
+    }
+
+    function updateShips(dt) {
+      var i, s;
+      for (i = ships.n - 1; i >= 0; i--) {
+        s = ships.list[i];
+        s.t += dt;
+        if (s.striker) {
+          var want = U.clamp(player.x - s.x, -40, 40);   // subtil homing ±40px/s
+          s.hx += (want - s.hx) * Math.min(1, dt * 3);
+          s.x = U.clamp(s.x + s.hx * dt, 24, cfg.W - 24);
+        } else {
+          s.x = s.baseX + Math.sin(s.t * 2.2 + s.phase) * 90;  // sinus ±90, ω 2.2
+        }
+        s.y += s.vy * dt;
+        s.shootT -= dt;
+        if (s.shootT <= 0 && s.y > 10 && player.alive) {
+          enemyFire(s);
+          s.shootT = s.striker ? U.rand(1.5, 2.5) : U.rand(2.2, 3.4);  // ~0.5/s resp ~0.35/s
+        }
+        if (s.y > cfg.H + 50) pkill(ships, i);
+      }
+    }
+
+    function updateRocks(dt) {
+      var i, o;
+      for (i = rocks.n - 1; i >= 0; i--) {
+        o = rocks.list[i];
+        o.x += o.vx * dt; o.y += o.vy * dt; o.ang += o.av * dt;
+        if (o.y > cfg.H + 50 || o.x < -60 || o.x > cfg.W + 60) pkill(rocks, i);
+      }
+    }
+
+    function updateEbullets(dt) {
+      var i, b;
+      for (i = ebul.n - 1; i >= 0; i--) {
+        b = ebul.list[i];
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.y > cfg.H + 12 || b.y < -14 || b.x < -12 || b.x > cfg.W + 12) pkill(ebul, i);
+      }
+    }
+
+    function updatePows(dt) {
+      var i, o;
+      for (i = pows.n - 1; i >= 0; i--) {
+        o = pows.list[i];
+        o.t += dt; o.y += o.vy * dt;
+        if (o.y > cfg.H + 30) pkill(pows, i);
+      }
+    }
+
+    /* ============================================================
+       KOLLISIONER — uteslutande NV.util.hits (kvadratisk dist)
+       Order per kontrakt: bullet×ship|rock → ship×player → rock×player → ebullet×player
+       ============================================================ */
+    function collisions() {
+      var i, j, b, s, o, hit;
+      var shieldOn = shield > 0;
+      var canHit = player.alive && invuln <= 0;   // blink = kollisioner skippas
+
+      for (i = bullets.n - 1; i >= 0; i--) {
+        b = bullets.list[i];
+        hit = false;
+        for (j = ships.n - 1; j >= 0; j--) {
+          s = ships.list[j];
+          if (U.hits(b.x, b.y, BOLT_R, s.x, s.y, s.r)) {
+            s.hp--; hit = true;
+            burst(b.x, b.y, COL.white, 3, 120);
+            if (s.hp <= 0) killShip(j, true);
+            break;
+          }
+        }
+        if (!hit && rocks.n > 0) {
+          for (j = rocks.n - 1; j >= 0; j--) {
+            o = rocks.list[j];
+            if (U.hits(b.x, b.y, BOLT_R, o.x, o.y, o.r)) {
+              o.hp--; hit = true;
+              burst(b.x, b.y, COL.white, 3, 120);
+              if (o.hp <= 0) killRock(j, true);
+              break;
+            }
+          }
+        }
+        if (hit) pkill(bullets, i);
+      }
+
+      if (canHit) {
+        for (j = ships.n - 1; j >= 0; j--) {
+          s = ships.list[j];
+          if (U.hits(s.x, s.y, s.r, player.x, player.y, PLAYER_R)) {
+            if (shieldOn) killShip(j, true);          // kontaktsdöd: poäng + explode, inget tappt liv
+            else { killShip(j, false); playerDamage(); }  // ram-kill utan poäng (undviker re-träff)
+          }
+        }
+        for (j = rocks.n - 1; j >= 0; j--) {
+          o = rocks.list[j];
+          if (U.hits(o.x, o.y, o.r, player.x, player.y, PLAYER_R)) {
+            if (shieldOn) killRock(j, true);
+            else { killRock(j, false); playerDamage(); }
+          }
+        }
+        for (i = ebul.n - 1; i >= 0; i--) {
+          b = ebul.list[i];
+          if (U.hits(b.x, b.y, 3, player.x, player.y, PLAYER_R)) {
+            pkill(ebul, i);
+            if (shieldOn) burst(b.x, b.y, COL.magenta, 6, 180);  // sköld: kontaktdöd bult, ingen poäng (inget SCORE-värde för bultar)
+            else playerDamage();
+          }
+        }
+      }
+    }
+
+    /* ============================================================
+       AMBIENT (alla states) — stjärnor/nebula drift, partiklar, decay
+       ============================================================ */
+    function updateStars(dt) {
+      var i, arr, k, v;
+      for (k = 0; k < 3; k++) {
+        arr = (k === 0) ? star0 : (k === 1) ? star1 : star2;
+        v = STARSPEED[k];
+        for (i = 0; i < arr.length; i++) {
+          arr[i].y += v * dt;
+          if (arr[i].y > cfg.H + 2) arr[i].y -= cfg.H + 4;
+        }
+      }
+    }
+
+    function updateParts(dt) {
+      var i, p;
+      for (i = parts.n - 1; i >= 0; i--) {
+        p = parts.list[i];
+        p.life -= dt;
+        if (p.life <= 0) { pkill(parts, i); continue; }
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.kind === 1) { p.a += p.spin * dt; p.vx *= (1 - 1.4 * dt); p.vy *= (1 - 1.4 * dt); }
+      }
+    }
+
+    function updateFx(dt) {
+      var i, o;
+      for (i = fx.n - 1; i >= 0; i--) {
+        o = fx.list[i];
+        o.t += dt;
+        if (o.t >= o.max) { pkill(fx, i); continue; }
+        if (o.kind === 0) o.y -= 30 * dt;
+      }
+    }
+
+    function step(dt) {
+      ambT += dt;
+      updateStars(dt);
+      updateParts(dt);
+      updateFx(dt);
+      if (shake > 0) { shake -= SHAKE_DECAY * dt; if (shake < 0) shake = 0; }
+      if (state === 'playing') sim(dt);
+      if (overPending) {
+        overPending = false;
+        if (cbOver) cbOver(overRes);
+      }
+      render();
+      if (state === 'playing') hudTick(dt);
+    }
+
+    /* ============================================================
+       RENDER — DPR per frame + shake → setTransform (kontrakt §3)
+       ============================================================ */
+    function neb(x, y, r, col) {
+      var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, col);
+      g.addColorStop(1, 'rgba(4,6,15,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.fill();
+    }
+
+    function drawNebula() {
+      neb(cfg.W * 0.30 + Math.sin(ambT * 0.11) * 70, cfg.H * 0.34 + Math.cos(ambT * 0.09) * 46,
+          430, 'rgba(122,43,255,0.14)');
+      neb(cfg.W * 0.74 + Math.cos(ambT * 0.13) * 80, cfg.H * 0.58 + Math.sin(ambT * 0.07) * 44,
+          500, 'rgba(0,255,247,0.09)');
+    }
+
+    function drawStars() {
+      var i, arr, k, sz;
+      for (k = 0; k < 3; k++) {
+        arr = (k === 0) ? star0 : (k === 1) ? star1 : star2;
+        sz = [1, 1.6, 2.4][k];
+        ctx.fillStyle = STARCOL[k];
+        for (i = 0; i < arr.length; i++) ctx.fillRect(arr[i].x, arr[i].y, sz, sz);
+      }
+    }
+
+    function drawRock(o) {
+      var k, an, rr, px, py;
+      ctx.beginPath();
+      for (k = 0; k < o.np; k++) {
+        an = o.ang + k * TAU / o.np;
+        rr = o.pts[k];
+        px = o.x + Math.cos(an) * rr;
+        py = o.y + Math.sin(an) * rr;
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#0c1424';
+      ctx.fill();
+      ctx.strokeStyle = (o.size === 'L') ? 'rgba(154,167,193,0.95)' : 'rgba(154,167,193,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    function drawShip(s) {
+      ctx.beginPath();
+      if (s.striker) {
+        ctx.moveTo(s.x, s.y + 17);
+        ctx.lineTo(s.x + 13, s.y - 2);
+        ctx.lineTo(s.x + 5, s.y - 12);
+        ctx.lineTo(s.x, s.y - 6);
+        ctx.lineTo(s.x - 5, s.y - 12);
+        ctx.lineTo(s.x - 13, s.y - 2);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,43,214,0.14)';
+        ctx.strokeStyle = COL.magenta;
+      } else {
+        ctx.moveTo(s.x, s.y + 14);
+        ctx.lineTo(s.x + 9, s.y - 8);
+        ctx.lineTo(s.x, s.y - 3);
+        ctx.lineTo(s.x - 9, s.y - 8);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0,255,247,0.12)';
+        ctx.strokeStyle = COL.cyan;
+      }
+      ctx.shadowColor = ctx.strokeStyle;
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 1;
+    }
+
+    function drawPow(o) {
+      var puls = 1 + 0.12 * Math.sin(ambT * 5 + o.t * 4);
+      var r = o.r * puls, k, an, px, py;
+      var col = (o.type === 'shield') ? COL.cyan : COL.magenta;
+      ctx.beginPath();
+      for (k = 0; k < 6; k++) {
+        an = o.t * 1.5 + k * TAU / 6;
+        px = o.x + Math.cos(an) * r;
+        py = o.y + Math.sin(an) * r;
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(10,16,34,0.85)';
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 9;
+      ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.font = FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(o.type === 'shield' ? 'S' : '3', o.x, o.y + 1);
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 1;
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    function drawPlayer() {
+      if (!player.alive) return;
+      var blinkA = (invuln > 0 && (Math.floor(ambT * 16) % 2 === 0)) ? 0.3 : 1;
+      /* amber atomic glow */
+      ctx.globalAlpha = blinkA * 0.35;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, 26, 0, TAU);
+      ctx.fillStyle = 'rgba(255,180,74,0.08)';
+      ctx.fill();
+      /* triangel-ship (r13) */
+      ctx.beginPath();
+      ctx.moveTo(player.x, player.y - 16);
+      ctx.lineTo(player.x + 11, player.y + 12);
+      ctx.lineTo(player.x, player.y + 6);
+      ctx.lineTo(player.x - 11, player.y + 12);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255,180,74,0.22)';
+      ctx.strokeStyle = COL.amber;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = COL.amber;
+      ctx.shadowBlur = 14;
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 1;
+      if (shield > 0) {   /* sköldring: kontaktdöd-aktiv */
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, 21, 0, TAU);
+        ctx.strokeStyle = 'rgba(0,255,247,0.55)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, 24 + Math.sin(ambT * 7) * 2, 0, Math.PI * 1.5);
+        ctx.strokeStyle = 'rgba(0,255,247,0.3)';
+        ctx.stroke();
+        ctx.lineWidth = 1;
+      }
+      if (tri > 0) {
+        ctx.fillStyle = COL.magenta;
+        ctx.fillRect(player.x - 13, player.y - 4, 2, 6);
+        ctx.fillRect(player.x + 11, player.y - 4, 2, 6);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawPlayerBullets() {
+      var i, b;
+      ctx.strokeStyle = '#bffcff';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (i = 0; i < bullets.n; i++) {
+        b = bullets.list[i];
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - b.vx * 0.012, b.y - b.vy * 0.012);
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      ctx.lineWidth = 1;
+    }
+
+    function drawEbles() {
+      var i, b;
+      for (i = 0; i < ebul.n; i++) {
+        b = ebul.list[i];
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 5.5, 0, TAU);
+        ctx.fillStyle = 'rgba(255,43,214,0.28)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 3, 0, TAU);
+        ctx.fillStyle = COL.magenta;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 1.2, 0, TAU);
+        ctx.fillStyle = COL.white;
+        ctx.fill();
+      }
+    }
+
+    function drawParts() {
+      var i, p, t, ca, sa, hl;
+      ctx.globalCompositeOperation = 'lighter';
+      for (i = 0; i < parts.n; i++) {
+        p = parts.list[i];
+        t = p.life / p.max;
+        if (t > 1) t = 1;
+        ctx.globalAlpha = t;
+        ctx.fillStyle = p.col;
+        if (p.kind === 1) {
+          ca = Math.cos(p.a); sa = Math.sin(p.a); hl = p.len * 0.5 * t;
+          ctx.beginPath();
+          ctx.moveTo(p.x + ca * hl, p.y + sa * hl);
+          ctx.lineTo(p.x - sa * p.size, p.y + ca * p.size);
+          ctx.lineTo(p.x - ca * hl, p.y - sa * hl);
+          ctx.lineTo(p.x + sa * p.size, p.y - ca * p.size);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * (0.4 + 0.6 * t), 0, TAU);
+          ctx.fill();
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+
+    function drawFx() {
+      var i, o, k;
+      for (i = 0; i < fx.n; i++) {
+        o = fx.list[i];
+        k = 1 - o.t / o.max;
+        if (o.kind === 0) {
+          ctx.globalAlpha = k;
+          ctx.fillStyle = o.col;
+          ctx.font = FONT;
+          ctx.textAlign = 'center';
+          ctx.fillText(o.text, o.x + Math.sin(o.t * 6) * 2, o.y);   /* rotfloat-wobble */
+        } else {
+          ctx.globalAlpha = k * 0.8;
+          ctx.strokeStyle = o.col;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(o.x, o.y, 10 + (1 - k) * 34, 0, TAU);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function render() {
+      /* kanvas-resize dpr varje frame (kontrakt) — assign clearar även bitmap */
+      var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+      if (dpr < 1) dpr = 1; else if (dpr > 3) dpr = 3;
+      var cw = Math.round(cfg.W * dpr), ch = Math.round(cfg.H * dpr);
+      cv.width = cw; cv.height = ch;
+      if (cv.style.width !== '100%') { cv.style.width = '100%'; }
+      ctx.setTransform(cw / cfg.W, 0, 0, ch / cfg.H, 0, 0);
+
+      /* screenShake 14px decay → translate i logiska px */
+      if (shake > 0.01) ctx.translate(U.rand(-shake, shake), U.rand(-shake, shake));
+
+      ctx.fillStyle = COL.bg;
+      ctx.fillRect(-24, -24, cfg.W + 48, cfg.H + 48);
+
+      drawNebula();
+      drawStars();
+      var i;
+      for (i = 0; i < pows.n; i++) drawPow(pows.list[i]);
+      for (i = 0; i < rocks.n; i++) drawRock(rocks.list[i]);
+      for (i = 0; i < ships.n; i++) drawShip(ships.list[i]);
+      drawEbles();
+      drawPlayer();
+      drawPlayerBullets();
+      drawParts();
+      drawFx();
+    }
+
+    /* ============================================================
+       GAMELOOP — dt i SEKUNDER, cap 0.05 (inget tab-blur-hop-framing)
+       ============================================================ */
+    var rafFn = (typeof scope.requestAnimationFrame === 'function') ? function (f) { return scope.requestAnimationFrame(f); } : null;
+
+    function frame(ts) {
+      if (destroyed) return;
+      rafId = (rafFn) ? rafFn(frame) : -1;
+      var dt;
+      if (lastT === null) dt = 0;
+      else dt = (ts - lastT) / 1000;
+      lastT = ts;
+      if (!(dt > 0)) dt = 0; else if (dt > 0.05) dt = 0.05;
+      step(dt);
+    }
+
+    function doDestroy() {
+      if (destroyed) return;
+      destroyed = true; running = false;
+      if (rafFn && scope.cancelAnimationFrame && rafId !== -1 && rafId !== null) scope.cancelAnimationFrame(rafId);
+      scope.removeEventListener('keydown', onKeyDown);
+      scope.removeEventListener('keyup', onKeyUp);
+      scope.removeEventListener('blur', onBlur);
+      pclear(bullets); pclear(ships); pclear(rocks); pclear(ebul);
+      pclear(parts); pclear(pows); pclear(fx);
+    }
+
+    /* --- init: stjärnor, meny-state, listeners, rAF --- */
+    initStars();
+    scope.addEventListener('keydown', onKeyDown);
+    scope.addEventListener('keyup', onKeyUp);
+    scope.addEventListener('blur', onBlur);
+    setState('menu');
+    hudEmit();                 /* initial HUD (score 0, hi cachad) */
+    if (rafFn) rafId = rafFn(frame);
+
+    /* --- publikt API (exakt kontrakt §3-signaturen) --- */
+    return {
+      start: function () { if (destroyed) return; resetRun(); setState('playing'); },
+      restart: function () { if (destroyed) return; resetRun(); setState('playing'); },
+      toMenu: function () { if (destroyed) return; resetRun(); setState('menu'); },
+      pause: function () { if (destroyed) return; if (state === 'playing') setState('paused'); },
+      resume: function () { if (destroyed) return; if (state === 'paused') { lastT = null; setState('playing'); } },
+      togglePause: function () {
+        if (destroyed) return;
+        if (state === 'playing') setState('paused');
+        else if (state === 'paused') { lastT = null; setState('playing'); }
+      },
+      destroy: doDestroy,
+      getState: function () { return state; }
+    };
+  };
+})();
+</script>
+<script>
+/* NEONVOID — ledad boot: kör integrationen av skärmar, HUD, button wiring och highscore-flöde. */
+(function () {
+  'use strict';
+  var $id = function (id) { return document.getElementById(id); };
+  var cv = $id('game');
+  if (!cv) throw new Error('NEONVOID boot: #game saknas');
+
+  var els = {
+    screens: { menu: $id('screen-menu'), pause: $id('screen-pause'), over: $id('screen-over') },
+    score: $id('hud-score'), hi: $id('hud-high'), lives: $id('hud-lives'),
+    badgeShield: $id('hud-shield'), badgeTri: $id('hud-tri'),
+    overScore: $id('over-score'), bestNew: $id('over-best-new'),
+    menuList: $id('menu-highscores'), overList: $id('over-highscores'),
+    btnSound: $id('btn-sound'),
+    btnStart: $id('btn-start'), btnResume: $id('btn-resume'), btnRestart: $id('btn-restart'),
+    btnAgain: $id('btn-again'), btnMenu: $id('btn-menu')
+  };
+  ['menu', 'pause', 'over'].forEach(function (k) {
+    if (!els.screens[k]) throw new Error('NEONVOID boot: DOM-element "screen-' + k + '" saknas');
+  });
+  ['btnStart', 'btnAgain'].forEach(function (k) {
+    if (!els[k]) throw new Error('NEONVOID boot: DOM-element "' + k + '" saknas');
+  });
+  var livesEls = Array.prototype.slice.call(els.lives.querySelectorAll('i'));
+
+  var fmt = { pad: function (n) { n = Math.max(0, n | 0); var s = String(n); while (s.length < 6) s = '0' + s; return s; } };
+
+  function showScreen(name) {
+    ['menu', 'pause', 'over'].forEach(function (k) {
+      els.screens[k].classList.toggle('show', k === name);
+    });
+  }
+
+  function listToHtml(list, max) {
+    if (!list.length) return '<li class="hs-empty">Inga resultat ännu — skriv historia!</li>';
+    var out = '';
+    for (var i = 0; i < list.length && i < max; i++) {
+      out += '<li><span class="hs-rank">' + (i + 1) + '</span>' +
+             '<span class="hs-score">' + fmt.pad(list[i].score) + '</span>' +
+             '<span class="hs-date">' + list[i].date + '</span></li>';
+    }
+    return out;
+  }
+
+  function renderList(ol, max) {
+    var list = [];
+    try { list = NV.scores.load(); } catch (e) { list = []; }
+    if (ol) ol.innerHTML = listToHtml(list, max);
+  }
+
+  var IS_MUTED = false;
+  function syncSoundBtn() {
+    try { IS_MUTED = !!NV.audio.isMuted(); } catch (e) {}
+    els.btnSound.textContent = IS_MUTED ? '🔇' : '🔊';
+    els.btnSound.setAttribute('aria-label', IS_MUTED ? 'Slå på ljud (M)' : 'Stäng av ljud (M)');
+    els.btnSound.setAttribute('aria-pressed', IS_MUTED ? 'true' : 'false');
+  }
+
+  function onHud(hud) {
+    els.score.textContent = fmt.pad(hud.score);
+    els.hi.textContent = fmt.pad(hud.hi);
+    for (var i = 0; i < livesEls.length; i++) livesEls[i].classList.toggle('lost', i >= hud.lives);
+    var sh = hud.shield > 0 ? 'SKÖLD ' + Math.ceil(hud.shield) + 's' : null;
+    var tr = hud.tri > 0 ? 'TRI ' + Math.ceil(hud.tri) + 's' : null;
+    if (sh) { els.badgeShield.textContent = sh; els.badgeShield.classList.remove('hide'); }
+    else { els.badgeShield.classList.add('hide'); els.badgeShield.textContent = 'SKÖLD'; }
+    if (tr) { els.badgeTri.textContent = tr; els.badgeTri.classList.remove('hide'); }
+    else { els.badgeTri.classList.add('hide'); els.badgeTri.textContent = 'TRI'; }
+  }
+
+  function onState(state) {
+    if (state === 'playing') showScreen(null);
+    else if (state === 'paused') showScreen('pause');
+    else if (state === 'over') showScreen('over');
+    else showScreen('menu');
+    if (state === 'menu') renderList(els.menuList, 5);
+  }
+
+  function onGameOver(res) {
+    var added = null;
+    try { added = NV.scores.add(res.score); } catch (e) { added = null; }
+    els.overScore.textContent = fmt.pad(res.score);
+    if (els.bestNew) els.bestNew.classList.toggle('show', !!(added && added.isBest));
+    renderList(els.overList, 8);
+  }
+
+  function startRun() {
+    try { NV.audio.init(); NV.audio.play('select'); } catch (e) {}
+    game.start();
+  }
+
+  // Init flows — skapa motorn först, koppla knappar efter
+  var game = NV.game.create(cv, { onState: onState, onHud: onHud, onGameOver: onGameOver });
+  NV.gameInstance = game; // smoke/test-hook + ev. debugging: pekar på den aktiva run-instansen
+
+  els.btnStart.addEventListener('click', startRun);
+  els.btnResume.addEventListener('click', function () { try { NV.audio.play('select'); } catch (e) {} game.resume(); });
+  els.btnRestart.addEventListener('click', function () { try { NV.audio.play('select'); } catch (e) {} game.restart(); });
+  els.btnAgain.addEventListener('click', function () { try { NV.audio.play('select'); } catch (e) {} game.restart(); });
+  els.btnMenu.addEventListener('click', function () { try { NV.audio.play('select'); } catch (e) {} game.toMenu(); });
+  els.btnSound.addEventListener('click', function () {
+    try { NV.audio.init(); NV.audio.toggleMuted(); } catch (e) {}
+    syncSoundBtn();
+  });
+
+  window.addEventListener('keydown', function (e) {
+    var st = game.getState();
+    if (e.code === 'Enter') {
+      if (st === 'menu') { startRun(); }
+      else if (st === 'over') { try { NV.audio.play('select'); } catch (err) {} game.restart(); }
+      else if (st === 'paused') { try { NV.audio.play('select'); } catch (err) {} game.resume(); }
+    } else if (e.code === 'KeyM') {
+      try { NV.audio.init(); NV.audio.toggleMuted(); } catch (err) {}
+      syncSoundBtn();
+    }
+  });
+
+  renderList(els.menuList, 5);
+})();
+</script>
+</body>
+</html>

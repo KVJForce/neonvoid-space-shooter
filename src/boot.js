@@ -15,7 +15,10 @@
     btnStart: $id('btn-start'), btnResume: $id('btn-resume'), btnRestart: $id('btn-restart'),
     btnAgain: $id('btn-again'), btnMenu: $id('btn-menu')
   };
-  ['screens.menu', 'screens.pause', 'screens.over', 'btnStart', 'btnAgain'].forEach(function (k) {
+  ['menu', 'pause', 'over'].forEach(function (k) {
+    if (!els.screens[k]) throw new Error('NEONVOID boot: DOM-element "screen-' + k + '" saknas');
+  });
+  ['btnStart', 'btnAgain'].forEach(function (k) {
     if (!els[k]) throw new Error('NEONVOID boot: DOM-element "' + k + '" saknas');
   });
   var livesEls = Array.prototype.slice.call(els.lives.querySelectorAll('i'));
@@ -88,6 +91,7 @@
 
   // Init flows — skapa motorn först, koppla knappar efter
   var game = NV.game.create(cv, { onState: onState, onHud: onHud, onGameOver: onGameOver });
+  NV.gameInstance = game; // smoke/test-hook + ev. debugging: pekar på den aktiva run-instansen
 
   els.btnStart.addEventListener('click', startRun);
   els.btnResume.addEventListener('click', function () { try { NV.audio.play('select'); } catch (e) {} game.resume(); });

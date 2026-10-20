@@ -1,0 +1,534 @@
+/* ============================================================
+   NEONVOID — styles.css (Agent A)
+   Fullständig UI-stylesheet enligt kontrakt §5:
+   palett via CSS-variabler, .screen/.show-mekanik, glitch-titel,
+   neonknappar, HUD + badges, highscore-listor, scanlines/vignette,
+   :focus-visible och prefers-reduced-motion-fallback.
+   ============================================================ */
+
+/* ---------- 1. Palett + typsnittsstack ---------- */
+:root {
+  --bg: #04060f;
+  --cyan: #00fff7;
+  --magenta: #ff2bd6;
+  --violet: #7a2bff;
+  --amber: #ffb44a;
+  --dim: #9aa7c1;
+  --panel: rgba(10, 16, 34, .86);
+  --danger: #ff3355;
+  --ink: #e8f4ff;
+  --font-mono: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+  color-scheme: dark;
+}
+
+/* ---------- 2. Bas ---------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-mono);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 750px at 78% -12%, rgba(122, 43, 255, .16), transparent 60%),
+    radial-gradient(950px 700px at 8% 112%, rgba(255, 43, 214, .10), transparent 55%);
+  background-attachment: fixed;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, p, dl, ol {
+  margin: 0;
+}
+
+::selection {
+  background: var(--cyan);
+  color: #05131d;
+}
+
+/* ---------- 3. App-ram ---------- */
+#app {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(.6rem, 2vh, 1.5rem) 0;
+  overflow: hidden;
+}
+
+.frame {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .7rem;
+  max-width: fit-content;
+  margin-inline: auto;
+}
+
+/* ---------- 4. Scanlines + vignette (dekor, klickar inte) ---------- */
+.scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .35) 0 1px, transparent 1px 3px);
+  opacity: .12;
+  z-index: 3;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse, transparent 55%, rgba(0, 0, 0, .4));
+  z-index: 3;
+}
+
+/* ---------- 5. HUD ---------- */
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem 1.1rem;
+  padding: .5rem .9rem;
+  user-select: none;
+}
+
+.hud-item {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.hud-label {
+  font-size: .7rem;
+  letter-spacing: .25em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.hud-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 247, .55);
+  font-variant-numeric: tabular-nums;
+}
+
+#hud-shield {
+  margin-left: auto;
+}
+
+.hud-lives {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 1.1rem;
+}
+
+/* Clip-path klipper box-shadow utanför figuren → glow via drop-shadow
+   som ligger EFTER klippet i renderingskedjan. */
+.hud-lives i {
+  display: inline-block;
+  width: 14px;
+  height: 16px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: var(--cyan);
+  filter: drop-shadow(0 0 4px rgba(0, 255, 247, .6));
+  transition: background-color .25s ease, filter .25s ease, opacity .25s ease;
+}
+
+.hud-lives i.lost {
+  background: #3d455c;
+  filter: none;
+  opacity: .55;
+}
+
+/* ---------- 6. Stage + canvas ---------- */
+.stage-wrap {
+  position: relative;
+  width: 96vw;
+  max-width: 1280px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  margin-inline: auto;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 24px rgba(0, 255, 247, .25), inset 0 0 60px rgba(0, 255, 247, .06);
+  background: #04060f;
+}
+
+/* ---------- 7. Skärmar (.screen + .show) ---------- */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .85rem;
+  padding: 2rem 1.4rem;
+  text-align: center;
+  background: var(--panel);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 2;
+  overflow: auto;
+}
+
+.screen.show {
+  display: flex;
+  animation: fade-in-up .35s cubic-bezier(.22, .7, .3, 1) both;
+}
+
+.tagline {
+  color: var(--amber);
+  font-size: .82rem;
+  letter-spacing: .14em;
+}
+
+.legend {
+  color: var(--dim);
+  font-size: .72rem;
+  letter-spacing: .18em;
+  max-width: 60ch;
+}
+
+.subtitle {
+  color: var(--magenta);
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(255, 43, 214, .5);
+}
+
+/* ---------- 8. Highscore-listor ---------- */
+.screen ol {
+  list-style: none;
+  padding: .35rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  align-items: center;
+}
+
+#menu-highscores li,
+#over-highscores li {
+  display: grid;
+  grid-template-columns: 2.6ch 8ch 11ch;
+  column-gap: 1rem;
+  align-items: baseline;
+  padding: .3rem .5rem;
+  border-bottom: 1px solid rgba(122, 43, 255, .16);
+  font-size: .95rem;
+}
+
+.hs-rank {
+  color: var(--violet);
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(122, 43, 255, .55);
+}
+
+.hs-score {
+  color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 247, .45);
+  font-variant-numeric: tabular-nums;
+}
+
+.hs-date {
+  color: var(--dim);
+  font-size: .78em;
+  letter-spacing: .08em;
+}
+
+/* Tom lista (boot: <li class="hs-empty">) — en rad, utan hairline. */
+.hs-empty {
+  display: block;
+  color: var(--dim);
+  font-style: italic;
+  letter-spacing: .1em;
+  font-size: .9rem;
+  border-bottom: 0;
+}
+
+/* ---------- 9. Game over ---------- */
+.over-label {
+  font-size: .75rem;
+  letter-spacing: .3em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+.over-value,
+#over-score {
+  font-size: clamp(2.4rem, 6.5vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: .16em;
+  line-height: 1.1;
+  color: #f2feff;
+  text-shadow: 0 0 10px var(--cyan), 0 0 34px rgba(0, 255, 247, .55);
+  font-variant-numeric: tabular-nums;
+}
+
+/* NYTT REKORD! — dold utan .show (boot togglar .show). */
+.badge-new,
+#over-best-new {
+  display: none;
+}
+
+.badge-new.show,
+#over-best-new.show {
+  display: inline-block;
+  margin-top: .2rem;
+  padding: 3px 12px;
+  border: 1px solid var(--magenta);
+  border-radius: 14px;
+  color: var(--magenta);
+  background: rgba(255, 43, 214, .07);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .28em;
+  text-shadow: 0 0 8px rgba(255, 43, 214, .7);
+  box-shadow: 0 0 10px rgba(255, 43, 214, .35), inset 0 0 8px rgba(255, 43, 214, .15);
+  animation: pulse-badge 1.15s ease-in-out infinite;
+}
+
+/* ---------- 10. Paus ---------- */
+.title-sm {
+  font-size: clamp(1.7rem, 4.5vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: .32em;
+  color: var(--cyan);
+  text-shadow: 0 0 8px var(--cyan), 0 0 22px rgba(0, 255, 247, .55);
+}
+
+.hintP {
+  color: var(--dim);
+  font-size: .72rem;
+  letter-spacing: .14em;
+  margin-top: .25rem;
+}
+
+/* ---------- 11. Titel — glitch + flicker ---------- */
+.title {
+  position: relative;
+  display: inline-block;
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: .35em;
+  color: #eafeff;
+  text-shadow:
+    0 0 8px var(--cyan),
+    0 0 24px var(--cyan),
+    3px 0 12px var(--magenta),
+    -3px 0 12px var(--cyan);
+  animation: flicker 4.2s linear infinite;
+}
+
+/* Två pseudo-element med clip-path-slices: chromatiska fel-slices
+   som stegvis hoppar position (glitch). Statiskt läge ser ut som en
+   diskret chromatisk offset — synlig även utan animation. */
+.title::before,
+.title::after {
+  content: 'NEONVOID';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  text-shadow: none;
+}
+
+.title::before {
+  color: var(--magenta);
+  opacity: .85;
+  clip-path: inset(12% 0 44% 0);
+  animation: glitch-shift 2.6s steps(1, end) infinite;
+}
+
+.title::after {
+  color: var(--cyan);
+  opacity: .8;
+  clip-path: inset(58% 0 8% 0);
+  animation: glitch-shift 2.6s steps(1, end) infinite reverse;
+  animation-delay: -1.3s;
+}
+
+.title-over {
+  font-size: clamp(2rem, 5.5vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: .3em;
+  color: var(--danger);
+  text-shadow:
+    0 0 10px var(--danger),
+    0 0 26px rgba(255, 51, 85, .6),
+    3px 0 12px var(--magenta);
+  animation: flicker 5.5s linear infinite;
+}
+
+/* ---------- 12. Neonknappar ---------- */
+button {
+  font: inherit;
+}
+
+.btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--cyan);
+  border-radius: 3px;
+  color: var(--cyan);
+  padding: .65rem 1.4rem;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 255, 247, .12);
+  transition: box-shadow .2s ease, background-color .2s ease, color .2s ease, text-shadow .2s ease, transform .12s ease;
+}
+
+.btn:hover {
+  box-shadow: 0 0 24px rgba(0, 255, 247, .35);
+  background: rgba(0, 255, 247, .08);
+  text-shadow: 0 0 10px rgba(0, 255, 247, .8);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible,
+button:focus-visible {
+  outline: 2px dashed var(--magenta);
+  outline-offset: 3px;
+}
+
+.btn-primary {
+  box-shadow: 0 0 14px rgba(0, 255, 247, .22), inset 0 0 12px rgba(0, 255, 247, .08);
+  background: rgba(0, 255, 247, .05);
+  text-shadow: 0 0 12px rgba(0, 255, 247, .65);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 28px rgba(0, 255, 247, .45), inset 0 0 14px rgba(0, 255, 247, .12);
+}
+
+.btn-icon {
+  padding: .4rem .6rem;
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: 0;
+  border-radius: 6px;
+}
+
+/* ---------- 13. Badges (HUD) ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--cyan);
+  border-radius: 12px;
+  color: var(--cyan);
+  padding: 2px 8px;
+  font-size: .7rem;
+  letter-spacing: .22em;
+  text-shadow: 0 0 6px rgba(0, 255, 247, .5);
+  transition: opacity .25s ease;
+}
+
+.badge-tri {
+  border-color: var(--magenta);
+  color: var(--magenta);
+  text-shadow: 0 0 6px rgba(255, 43, 214, .5);
+}
+
+.badge.hide {
+  opacity: 0;
+}
+
+/* ---------- 14. Footer ---------- */
+.foot {
+  color: var(--dim);
+  font-size: .8rem;
+  letter-spacing: .14em;
+  text-align: center;
+  padding: .55rem .5rem .35rem;
+}
+
+/* ---------- 15. Keyframes ---------- */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  6%       { opacity: .84; }
+  8%       { opacity: 1; }
+  37%      { opacity: .93; }
+  39%      { opacity: .55; }
+  40%      { opacity: .92; }
+  42%      { opacity: 1; }
+  65%      { opacity: .88; }
+  67%      { opacity: 1; }
+  71%      { opacity: .7; }
+  73%      { opacity: 1; }
+}
+
+@keyframes glitch-shift {
+  0%, 100% { transform: none;              clip-path: inset(12% 0 44% 0); }
+  10%      { transform: translate(-5px, -2px); clip-path: inset(4% 0 52% 0); }
+  14%      { transform: translate(3px, 1px);   clip-path: inset(30% 0 30% 0); }
+  17%      { transform: none;              clip-path: inset(12% 0 44% 0); }
+  52%      { transform: translate(4px, 2px);   clip-path: inset(64% 0 2% 0); }
+  55%      { transform: translate(-3px, -1px); clip-path: inset(48% 0 20% 0); }
+  58%      { transform: none;              clip-path: inset(12% 0 44% 0); }
+  80%      { transform: translate(2px, -2px);  clip-path: inset(76% 0 0 0); }
+  83%      { transform: none;              clip-path: inset(12% 0 44% 0); }
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(255, 43, 214, .35), inset 0 0 8px rgba(255, 43, 214, .15);
+  }
+  50% {
+    transform: scale(1.045);
+    box-shadow: 0 0 22px rgba(255, 43, 214, .65), inset 0 0 12px rgba(255, 43, 214, .3);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 16. Åtkomst ---------- */
+/* Minskad rörelse: alla animationer av, men inget tappar synlighet.
+   Glitch-pseudona tas bort helt (dekoration); titeln, listorna,
+   badges och knappar är vanliga statiska element utan dem. */
+@media (prefers-reduced-motion: reduce) {
+  .title,
+  .title::before,
+  .title::after,
+  .title-over,
+  .scanlines,
+  .screen.show,
+  .badge-new.show,
+  #over-best-new.show {
+    animation: none;
+  }
+
+  .title::before,
+  .title::after {
+    content: none;
+  }
+}

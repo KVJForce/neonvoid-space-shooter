@@ -1,0 +1,42 @@
+<div id="app">
+ <div class="scanlines" aria-hidden="true"></div>
+ <div class="vignette" aria-hidden="true"></div>
+ <div class="frame">
+  <header class="hud">
+    <div class="hud-item"><span class="hud-label">POÄNG</span><span class="hud-value" id="hud-score">000000</span></div>
+    <div class="hud-item"><span class="hud-label">LIV</span><span class="hud-lives" id="hud-lives"><i></i><i></i><i></i></span></div>
+    <div class="hud-item"><span class="hud-label">REKORD</span><span class="hud-value" id="hud-high">000000</span></div>
+    <span class="badge hide" id="hud-shield">SKÖLD</span>
+    <span class="badge badge-tri hide" id="hud-tri">TRI</span>
+    <button type="button" class="btn btn-icon" id="btn-sound" aria-label="Växla ljud" title="Växla ljud (M)">🔊</button>
+  </header>
+  <main class="stage-wrap">
+    <canvas id="game" width="1280" height="720"></canvas>
+    <section id="screen-menu" class="screen show" role="dialog" aria-label="Huvudmeny">
+      <h1 class="title">NEONVOID</h1>
+      <p class="tagline">En neonklädd rymdjakt — överlev stjärnstormen!</p>
+      <dl class="legend"> RÖR DIG/WASD+PIL · SKJUT/MELLANSLAG · PAUSA/P/ESC · LJUD/M </dl>
+      <h2 class="subtitle">HIGHSCORE — TOPP 5</h2>
+      <ol id="menu-highscores"></ol>
+      <button type="button" class="btn btn-primary" id="btn-start">STARTA SPEL</button>
+    </section>
+    <section id="screen-pause" class="screen" role="dialog" aria-label="Pausad">
+      <h1 class="title-sm">PAUSAD</h1>
+      <button type="button" class="btn btn-primary" id="btn-resume">FORTSÄTT</button>
+      <button type="button" class="btn" id="btn-restart">STARTA OM</button>
+      <p class="hintP">P eller ESC för att återvända</p>
+    </section>
+    <section id="screen-over" class="screen" role="dialog" aria-label="Game over">
+      <h1 class="title-over">GAME OVER</h1>
+      <p class="over-label">DIN POÄNG</p>
+      <p class="over-value" id="over-score">000000</p>
+      <p class="badge-new show" id="over-best-new">NYTT REKORD!</p>
+      <h2 class="subtitle">HIGHSCORE — TOPP 8</h2>
+      <ol id="over-highscores"></ol>
+      <button type="button" class="btn btn-primary" id="btn-again">SPELA IGEN</button>
+      <button type="button" class="btn" id="btn-menu">MENY</button>
+    </section>
+  </main>
+  <footer class="foot">WASD/PIL — rör dig · MELLANSLAG — skjut · P/ESC — paus · M — ljud på/av</footer>
+ </div>
+</div>
